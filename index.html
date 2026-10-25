@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador de Retorno de Investimento - Solar & Baterias</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased">
+
+    <div class="max-w-6xl mx-auto px-4 py-8">
+        <!-- Header -->
+        <header class="mb-8 text-center">
+            <h1 class="text-3xl font-extrabold text-slate-900 mb-2">Simulador Avançado: Solar, Baterias Extras & Payback</h1>
+            <p class="text-slate-600">Compare Huawei 5k vs Sigenergy 6k personalizando o seu tarifário, expansão de bateria e inflação (2,5%/ano).</p>
+        </header>
+
+        <!-- Control Panel -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            <!-- Panels Slider -->
+            <div>
+                <label for="panelsRange" class="block text-sm font-semibold text-slate-700 mb-2">
+                    Painéis (640W): <span id="panelsVal" class="text-indigo-600 font-bold">4</span>
+                </label>
+                <input id="panelsRange" type="range" min="4" max="12" step="2" value="4" 
+                    class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                    oninput="updateSimulation()">
+            </div>
+
+            <!-- Extra Battery Slider -->
+            <div>
+                <label for="extraBatteryRange" class="block text-sm font-semibold text-slate-700 mb-2">
+                    Bateria Extra: <span id="extraBatteryVal" class="text-indigo-600 font-bold">0</span> kWh (<span id="extraBatteryCostVal">0 €</span>)
+                </label>
+                <input id="extraBatteryRange" type="range" min="0" max="15" step="1" value="0" 
+                    class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                    oninput="updateSimulation()">
+            </div>
+
+            <!-- Tariff Type Selector -->
+            <div>
+                <label for="tariffType" class="block text-sm font-semibold text-slate-700 mb-2">Tipo de Tarifário:</label>
+                <select id="tariffType" onchange="toggleTariffInputs(); updateSimulation();"
+                    class="w-full bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg p-2.5 focus:ring-indigo-500 focus:border-indigo-500">
+                    <option value="bi" selected>Bi-Horário (Dia / Noite)</option>
+                    <option value="single">Horário Simples (Normal)</option>
+                </select>
+            </div>
+
+            <!-- Inflation Rate -->
+            <div>
+                <label for="inflationRate" class="block text-sm font-semibold text-slate-700 mb-2">
+                    Inflação Energia: <span id="inflationVal" class="text-indigo-600 font-bold">2,5</span>%/ano
+                </label>
+                <input id="inflationRate" type="range" min="0.0" max="6.0" step="0.5" value="2.5" 
+                    class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                    oninput="updateSimulation()">
+            </div>
+
+            <!-- Single Tariff Price (Hidden by default) -->
+            <div id="singlePriceContainer" class="hidden">
+                <label for="priceSingle" class="block text-sm font-semibold text-slate-700 mb-2">
+                    Preço Eletricidade (Ano 1): <span id="priceSingleVal" class="text-indigo-600 font-bold">0,15</span> €/kWh
+                </label>
+                <input id="priceSingle" type="range" min="0.10" max="0.30" step="0.01" value="0.15" 
+                    class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                    oninput="updateSimulation()">
+            </div>
+
+            <!-- Bi-Tariff Day Price -->
+            <div id="biDayContainer">
+                <label for="priceDay" class="block text-sm font-semibold text-slate-700 mb-2">
+                    Fora do Vazio / Dia (Ano 1): <span id="priceDayVal" class="text-indigo-600 font-bold">0,15</span> €/kWh
+                </label>
+                <input id="priceDay" type="range" min="0.12" max="0.30" step="0.01" value="0.15" 
+                    class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                    oninput="updateSimulation()">
+            </div>
+
+            <!-- Bi-Tariff Night Price -->
+            <div id="biNightContainer">
+                <label for="priceNight" class="block text-sm font-semibold text-slate-700 mb-2">
+                    Vazio / Noite (Ano 1): <span id="priceNightVal" class="text-indigo-600 font-bold">0,10</span> €/kWh
+                </label>
+                <input id="priceNight" type="range" min="0.05" max="0.18" step="0.01" value="0.10" 
+                    class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                    oninput="updateSimulation()">
+            </div>
+
+            <!-- Consumption Split (Bi-Tariff only) -->
+            <div id="biSplitContainer" class="md:col-span-2">
+                <label for="nightConsumptionPct" class="block text-sm font-semibold text-slate-700 mb-2">
+                    Divisão Consumo (~11.040 kWh/ano): 
+                    Dia: <span id="dayPctVal" class="text-indigo-600 font-bold">50</span>% | 
+                    Noite (Vazio): <span id="nightPctVal" class="text-indigo-600 font-bold">50</span>%
+                </label>
+                <input id="nightConsumptionPct" type="range" min="10" max="90" step="5" value="50" 
+                    class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                    oninput="updateSimulation()">
+            </div>
+
+            <!-- Arbitrage Toggle (Bi-Tariff only) -->
+            <div id="arbitrageContainer" class="md:col-span-3 lg:col-span-4 flex items-center justify-between border-t pt-4">
+                <div class="flex items-center space-x-3">
+                    <input type="checkbox" id="enableArbitrage" checked 
+                        class="w-5 h-5 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                        onchange="updateSimulation()">
+                    <label for="enableArbitrage" class="text-sm font-semibold text-slate-800">
+                        Ativar Arbitragem Noturna (Carregar Bateria na Rede no Vazio para descarregar de Dia)
+                    </label>
+                </div>
+                <span class="text-xs text-slate-500">Eficiência de Conversão: 90% | Custo Bateria Extra: 300€/kWh</span>
+            </div>
+        </div>
+
+        <!-- Results Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <!-- Huawei Card -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 relative overflow-hidden">
+                <div class="absolute top-0 right-0 bg-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-bl-lg">Huawei 5k (<span id="huaweiBatCap">5</span> kWh Bateria)</div>
+                <h2 class="text-xl font-bold text-slate-900 mb-4">Huawei 5k</h2>
+                <div class="space-y-3 text-sm">
+                    <div class="flex justify-between border-b pb-2">
+                        <span class="text-slate-500">Investimento Total (c/ IVA):</span>
+                        <span id="huaweiCost" class="font-bold text-slate-800">7.874,13 €</span>
+                    </div>
+                    <div class="flex justify-between border-b pb-2">
+                        <span class="text-slate-500 font-semibold text-slate-700">Poupança anual e mensal no ano 1:</span>
+                        <span class="font-bold text-slate-800"><span id="huaweiYear1Saving">465,00 €</span> (<span id="huaweiMonthlyYear1" class="text-emerald-600">38,75 €/mês</span>)</span>
+                    </div>
+                    <div class="flex justify-between border-b pb-2">
+                        <span class="text-slate-500">Poupança média anual e mensal (20 anos c/ inflação):</span>
+                        <span class="font-bold text-slate-800"><span id="huaweiAvgSaving">580,00 €</span> (<span id="huaweiMonthlyAvg" class="text-emerald-600">48,33 €/mês</span>)</span>
+                    </div>
+                    <div class="flex justify-between pt-1">
+                        <span class="text-slate-700 font-semibold text-base">Tempo de Retorno (Payback):</span>
+                        <span id="huaweiPayback" class="text-xl font-extrabold text-indigo-600">11,4 Anos</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sigenergy Card -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 relative overflow-hidden">
+                <div class="absolute top-0 right-0 bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-bl-lg">Sigenergy 6k (<span id="sigenBatCap">6</span> kWh Bateria)</div>
+                <h2 class="text-xl font-bold text-slate-900 mb-4">Sigenergy 6k</h2>
+                <div class="space-y-3 text-sm">
+                    <div class="flex justify-between border-b pb-2">
+                        <span class="text-slate-500">Investimento Total (c/ IVA):</span>
+                        <span id="sigenCost" class="font-bold text-slate-800">9.565,44 €</span>
+                    </div>
+                    <div class="flex justify-between border-b pb-2">
+                        <span class="text-slate-500 font-semibold text-slate-700">Poupança anual e mensal no ano 1:</span>
+                        <span class="font-bold text-slate-800"><span id="sigenYear1Saving">465,00 €</span> (<span id="sigenMonthlyYear1" class="text-blue-600">38,75 €/mês</span>)</span>
+                    </div>
+                    <div class="flex justify-between border-b pb-2">
+                        <span class="text-slate-500">Poupança média anual e mensal (20 anos c/ inflação):</span>
+                        <span class="font-bold text-slate-800"><span id="sigenAvgSaving">580,00 €</span> (<span id="sigenMonthlyAvg" class="text-blue-600">48,33 €/mês</span>)</span>
+                    </div>
+                    <div class="flex justify-between pt-1">
+                        <span class="text-slate-700 font-semibold text-base">Tempo de Retorno (Payback):</span>
+                        <span id="sigenPayback" class="text-xl font-extrabold text-indigo-600">13,6 Anos</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chart Section -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8">
+            <h3 class="text-lg font-bold text-slate-900 mb-4">Evolução da Poupança Acumulada ao Longo de 20 Anos</h3>
+            <div class="relative h-80 w-full">
+                <canvas id="paybackChart"></canvas>
+            </div>
+        </div>
+
+        <!-- FAQ Section -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <h3 class="text-xl font-bold text-slate-900 mb-6 border-b pb-3">Perguntas Frequentes & Conclusões do Simulador (FAQ)</h3>
+            
+            <div class="space-y-4">
+                <!-- FAQ 1 -->
+                <details class="group border border-slate-200 rounded-xl p-4 [&_summary::-webkit-details-marker]:hidden" open>
+                    <summary class="flex items-center justify-between cursor-pointer font-bold text-slate-800">
+                        <span>Qual é o número ideal de painéis para otimizar o ROI (Payback)?</span>
+                        <span class="transition group-open:rotate-180">
+                            <svg fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" viewBox="0 0 24 24" width="24"><path d="M6 9l6 6 6-6"/></svg>
+                        </span>
+                    </summary>
+                    <div class="mt-3 text-sm text-slate-600 space-y-2 leading-relaxed">
+                        <p>O número ideal de painéis para acelerar o retorno do investimento situa-se habitualmente nos <strong>8 painéis</strong> (quando o espaço no telhado o permite):</p>
+                        <ul class="list-disc pl-5 space-y-1">
+                            <li><strong>O problema de 4 painéis:</strong> Começar com o mínimo penaliza o payback porque o custo fixo do inversor e da bateria é elevado face à pouca energia gerada.</li>
+                            <li><strong>O salto para 8 painéis:</strong> O custo marginal de adicionar mais 4 painéis é muito baixo (cerca de 430 € em material e estruturas), mas a produção solar duplica, diluindo rapidamente o investimento inicial e encurtando o tempo de retorno de forma significativa.</li>
+                        </ul>
+                    </div>
+                </details>
+
+                <!-- FAQ 2 -->
+                <details class="group border border-slate-200 rounded-xl p-4 [&_summary::-webkit-details-marker]:hidden">
+                    <summary class="flex items-center justify-between cursor-pointer font-bold text-slate-800">
+                        <span>O que significa "Arbitragem Noturna"?</span>
+                        <span class="transition group-open:rotate-180">
+                            <svg fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" viewBox="0 0 24 24" width="24"><path d="M6 9l6 6 6-6"/></svg>
+                        </span>
+                    </summary>
+                    <div class="mt-3 text-sm text-slate-600 space-y-2 leading-relaxed">
+                        <p>A <strong>arbitragem tarifária</strong> refere-se à gestão inteligente da bateria aproveitando a diferença de tarifas entre a noite e o dia:</p>
+                        <ul class="list-disc pl-5 space-y-1">
+                            <li><strong>Carregar à noite:</strong> O inversor força o carregamento da bateria a partir da rede pública durante as horas de <em>Vazio</em> (madrugada) a um preço mais barato (ex: 0,10 €/kWh).</li>
+                            <li><strong>Usar de dia:</strong> Durante o dia, em vez de comprar eletricidade cara da rede em <em>Fora do Vazio</em> (ex: 0,15 €/kWh), a casa consome a energia armazenada na bateria.</li>
+                            <li><strong>O ganho:</strong> Poupa-se a diferença tarifária (neste exemplo, 5 cêntimos por cada kWh ciclado entre a noite e o dia, descontando as pequenas perdas térmicas da bateria).</li>
+                        </ul>
+                    </div>
+                </details>
+
+                <!-- FAQ 3 -->
+                <details class="group border border-slate-200 rounded-xl p-4 [&_summary::-webkit-details-marker]:hidden">
+                    <summary class="flex items-center justify-between cursor-pointer font-bold text-slate-800">
+                        <span>Porque é que aumentar a capacidade da bateria (kWh) não diminui o tempo de retorno (payback)?</span>
+                        <span class="transition group-open:rotate-180">
+                            <svg fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" viewBox="0 0 24 24" width="24"><path d="M6 9l6 6 6-6"/></svg>
+                        </span>
+                    </summary>
+                    <div class="mt-3 text-sm text-slate-600 space-y-2 leading-relaxed">
+                        <p>Adicionar mais capacidade de bateria (a um custo de referência de <strong>300 € por cada kWh extra</strong>) encarece bastante o investimento inicial, mas o retorno financeiro adicional não acompanha esse custo pela seguinte razão:</p>
+                        <ol class="list-decimal pl-5 space-y-1">
+                            <li><strong>Custo vs. Ganho Marginal da Arbitragem:</strong> Se poupa cerca de 5 cêntimos por kWh ciclado na arbitragem, recuperar os 300 € investidos num único kWh extra puramente através de ciclos diários demora mais de 15 anos.</li>
+                            <li><strong>Limitação da Produção Solar:</strong> Com um número limitado de painéis (ex: 4 a 8 painéis), a energia solar excedentária diária é finita. Uma bateria base de 5 ou 6 kWh já consegue reter a maior parte desse excedente. Adicionar mais bateria significa que o espaço extra passará grande parte do ano vazio ou subutilizado, pois os painéis não produzem energia suficiente para a encher por completo.</li>
+                        </ol>
+                    </div>
+                </details>
+
+                <!-- FAQ 4 -->
+                <details class="group border border-slate-200 rounded-xl p-4 [&_summary::-webkit-details-marker]:hidden">
+                    <summary class="flex items-center justify-between cursor-pointer font-bold text-slate-800">
+                        <span>Porque é que alterar a divisão % entre Vazio e Fora de Vazio não muda o tempo de retorno (payback)?</span>
+                        <span class="transition group-open:rotate-180">
+                            <svg fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" viewBox="0 0 24 24" width="24"><path d="M6 9l6 6 6-6"/></svg>
+                        </span>
+                    </summary>
+                    <div class="mt-3 text-sm text-slate-600 space-y-2 leading-relaxed">
+                        <p>Há duas razões principais para o tempo de retorno se manter praticamente estável ao mudar esta percentagem:</p>
+                        <ol class="list-decimal pl-5 space-y-1">
+                            <li><strong>O sol só produz de dia:</strong> Com um consumo anual elevado (~11.040 kWh), o consumo da casa durante o período diurno continua a ser consideravelmente superior à energia que 4 a 8 painéis conseguem gerar. Assim, 100% da produção solar é absorvida instantaneamente durante o dia para evitar comprar eletricidade a preço mais alto.</li>
+                            <li><strong>Fatura base vs. Poupança dos Painéis:</strong> Ao passar mais consumo para a noite, a fatura base sem painéis diminui. No entanto, como os painéis continuam a abater exatamente os mesmos kWh de dia, a poupança gerada pelo investimento solar permanece inalterada.</li>
+                        </ol>
+                    </div>
+                </details>
+
+                <!-- FAQ 5 -->
+                <details class="group border border-slate-200 rounded-xl p-4 [&_summary::-webkit-details-marker]:hidden">
+                    <summary class="flex items-center justify-between cursor-pointer font-bold text-slate-800">
+                        <span>Usar a bateria e mover consumos para a noite reduz o consumo total de energia (kWh)?</span>
+                        <span class="transition group-open:rotate-180">
+                            <svg fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" viewBox="0 0 24 24" width="24"><path d="M6 9l6 6 6-6"/></svg>
+                        </span>
+                    </summary>
+                    <div class="mt-3 text-sm text-slate-600 space-y-2 leading-relaxed">
+                        <p><strong>Não.</strong> Mudar equipamentos para a noite desloca o momento do consumo (*load shifting*), mas os eletrodomésticos continuam a precisar dos mesmos kWh de energia para funcionar.</p>
+                        <p>Além disso, o uso da bateria envolve perdas físicas de conversão (cerca de 10% de eficiência perdida em calor na carga/descarga), pelo que o consumo total em kWh pode ser ligeiramente superior, embora a **fatura financeira em euros fique mais barata**.</p>
+                    </div>
+                </details>
+            </div>
+        </div>
+    </div>
+
+    <!-- Simulation Logic -->
+    <script>
+        let myChart = null;
+        const totalConsumption = 11040; // kWh/ano
+
+        function toggleTariffInputs() {
+            const type = document.getElementById('tariffType').value;
+            const singleDiv = document.getElementById('singlePriceContainer');
+            const biDayDiv = document.getElementById('biDayContainer');
+            const biNightDiv = document.getElementById('biNightContainer');
+            const biSplitDiv = document.getElementById('biSplitContainer');
+            const arbDiv = document.getElementById('arbitrageContainer');
+
+            if (type === 'single') {
+                singleDiv.classList.remove('hidden');
+                biDayDiv.classList.add('hidden');
+                biNightDiv.classList.add('hidden');
+                biSplitDiv.classList.add('hidden');
+                arbDiv.classList.add('hidden');
+            } else {
+                singleDiv.classList.add('hidden');
+                biDayDiv.classList.remove('hidden');
+                biNightDiv.classList.remove('hidden');
+                biSplitDiv.classList.remove('hidden');
+                arbDiv.classList.remove('hidden');
+            }
+        }
+
+        function updateSimulation() {
+            const panels = parseInt(document.getElementById('panelsRange').value);
+            const extraBatteryKwh = parseInt(document.getElementById('extraBatteryRange').value);
+            const tariffType = document.getElementById('tariffType').value;
+            const inflationRate = parseFloat(document.getElementById('inflationRate').value) / 100;
+
+            document.getElementById('panelsVal').innerText = panels;
+            document.getElementById('extraBatteryVal').innerText = extraBatteryKwh;
+            const extraBatteryCost = extraBatteryKwh * 300;
+            document.getElementById('extraBatteryCostVal').innerText = extraBatteryCost.toLocaleString('pt-PT') + ' €';
+
+            const huaweiBatCapacity = 5 + extraBatteryKwh;
+            const sigenBatCapacity = 6 + extraBatteryKwh;
+
+            document.getElementById('huaweiBatCap').innerText = huaweiBatCapacity;
+            document.getElementById('sigenBatCap').innerText = sigenBatCapacity;
+
+            document.getElementById('inflationVal').innerText = (inflationRate * 100).toLocaleString('pt-PT', {minimumFractionDigits: 1, maximumFractionDigits: 1});
+
+            let pDayBase, pNightBase, pSingleBase;
+            let nightPct = 50;
+
+            if (tariffType === 'single') {
+                pSingleBase = parseFloat(document.getElementById('priceSingle').value);
+                document.getElementById('priceSingleVal').innerText = pSingleBase.toLocaleString('pt-PT', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                pDayBase = pSingleBase;
+                pNightBase = pSingleBase;
+            } else {
+                pDayBase = parseFloat(document.getElementById('priceDay').value);
+                pNightBase = parseFloat(document.getElementById('priceNight').value);
+                nightPct = parseInt(document.getElementById('nightConsumptionPct').value);
+                
+                document.getElementById('priceDayVal').innerText = pDayBase.toLocaleString('pt-PT', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                document.getElementById('priceNightVal').innerText = pNightBase.toLocaleString('pt-PT', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                document.getElementById('nightPctVal').innerText = nightPct;
+                document.getElementById('dayPctVal').innerText = 100 - nightPct;
+            }
+
+            const enableArb = tariffType === 'bi' && document.getElementById('enableArbitrage').checked;
+
+            // Investment Costs
+            const extraPanels = panels - 4;
+            const extraPanelsCost = (extraPanels / 2) * 215.13;
+
+            const huaweiTotalCost = 7874.13 + extraPanelsCost + extraBatteryCost;
+            const sigenTotalCost = 9565.44 + extraPanelsCost + extraBatteryCost;
+
+            // Solar Production & Consumption Breakdown
+            const productionKwh = 3650 + (extraPanels * 912.5);
+            const selfConsRate = Math.min(0.95, Math.max(0.60, (0.85 + (extraBatteryKwh * 0.015)) - (extraPanels * 0.03)));
+            const selfConsKwh = productionKwh * selfConsRate;
+
+            const dayConsKwh = totalConsumption * ((100 - nightPct) / 100);
+            
+            // Arbitrage parameters
+            const arbDays = Math.max(90, 240 - (extraPanels * 20));
+            const roundTripEff = 0.90;
+
+            // 20 Years simulation loop
+            const years = Array.from({length: 21}, (_, i) => i);
+            let huaweiCumulative = [-huaweiTotalCost];
+            let sigenCumulative = [-sigenTotalCost];
+
+            let huaweiPaybackYear = null;
+            let sigenPaybackYear = null;
+
+            let huaweiYear1Saving = 0;
+            let sigenYear1Saving = 0;
+            let totalHuaweiSavings20y = 0;
+            let totalSigenSavings20y = 0;
+
+            let prevHuaweiVal = -huaweiTotalCost;
+            let prevSigenVal = -sigenTotalCost;
+
+            for (let y = 1; y <= 20; y++) {
+                const yearFactor = Math.pow(1 + inflationRate, y - 1);
+                const currentPDay = pDayBase * yearFactor;
+                const currentPNight = pNightBase * yearFactor;
+                const currentPSingle = pSingleBase ? (pSingleBase * yearFactor) : currentPDay;
+
+                let solarSavingYear = 0;
+                if (tariffType === 'single') {
+                    solarSavingYear = selfConsKwh * currentPSingle;
+                } else {
+                    const offsetDayKwh = Math.min(dayConsKwh, selfConsKwh);
+                    solarSavingYear = offsetDayKwh * currentPDay;
+                }
+
+                let huaweiArbSavingYear = 0;
+                let sigenArbSavingYear = 0;
+
+                if (enableArb) {
+                    const arbMarginPerKwh = Math.max(0, currentPDay - (currentPNight / roundTripEff));
+                    huaweiArbSavingYear = huaweiBatCapacity * arbMarginPerKwh * arbDays;
+                    sigenArbSavingYear = sigenBatCapacity * arbMarginPerKwh * arbDays;
+                }
+
+                const huaweiTotalSavingYear = solarSavingYear + huaweiArbSavingYear;
+                const sigenTotalSavingYear = solarSavingYear + sigenArbSavingYear;
+
+                if (y === 1) {
+                    huaweiYear1Saving = huaweiTotalSavingYear;
+                    sigenYear1Saving = sigenTotalSavingYear;
+                }
+
+                totalHuaweiSavings20y += huaweiTotalSavingYear;
+                totalSigenSavings20y += sigenTotalSavingYear;
+
+                const currentHuaweiVal = prevHuaweiVal + huaweiTotalSavingYear;
+                const currentSigenVal = prevSigenVal + sigenTotalSavingYear;
+
+                if (prevHuaweiVal < 0 && currentHuaweiVal >= 0 && huaweiPaybackYear === null) {
+                    huaweiPaybackYear = (y - 1) + (-prevHuaweiVal / huaweiTotalSavingYear);
+                }
+                if (prevSigenVal < 0 && currentSigenVal >= 0 && sigenPaybackYear === null) {
+                    sigenPaybackYear = (y - 1) + (-prevSigenVal / sigenTotalSavingYear);
+                }
+
+                huaweiCumulative.push(currentHuaweiVal);
+                sigenCumulative.push(currentSigenVal);
+
+                prevHuaweiVal = currentHuaweiVal;
+                prevSigenVal = currentSigenVal;
+            }
+
+            if (huaweiPaybackYear === null) huaweiPaybackYear = huaweiTotalCost / huaweiYear1Saving;
+            if (sigenPaybackYear === null) sigenPaybackYear = sigenTotalCost / sigenYear1Saving;
+
+            // UI Updates
+            document.getElementById('huaweiCost').innerText = huaweiTotalCost.toLocaleString('pt-PT', {style: 'currency', currency: 'EUR'});
+            document.getElementById('huaweiYear1Saving').innerText = huaweiYear1Saving.toLocaleString('pt-PT', {style: 'currency', currency: 'EUR'}) + ' / ano';
+            document.getElementById('huaweiMonthlyYear1').innerText = (huaweiYear1Saving / 12).toLocaleString('pt-PT', {style: 'currency', currency: 'EUR'}) + '/mês';
+            
+            const huaweiAvgYearly = totalHuaweiSavings20y / 20;
+            document.getElementById('huaweiAvgSaving').innerText = huaweiAvgYearly.toLocaleString('pt-PT', {style: 'currency', currency: 'EUR'}) + ' / ano';
+            document.getElementById('huaweiMonthlyAvg').innerText = (huaweiAvgYearly / 12).toLocaleString('pt-PT', {style: 'currency', currency: 'EUR'}) + '/mês';
+            document.getElementById('huaweiPayback').innerText = huaweiPaybackYear.toFixed(1).replace('.', ',') + ' Anos';
+
+            document.getElementById('sigenCost').innerText = sigenTotalCost.toLocaleString('pt-PT', {style: 'currency', currency: 'EUR'});
+            document.getElementById('sigenYear1Saving').innerText = sigenYear1Saving.toLocaleString('pt-PT', {style: 'currency', currency: 'EUR'}) + ' / ano';
+            document.getElementById('sigenMonthlyYear1').innerText = (sigenYear1Saving / 12).toLocaleString('pt-PT', {style: 'currency', currency: 'EUR'}) + '/mês';
+            
+            const sigenAvgYearly = totalSigenSavings20y / 20;
+            document.getElementById('sigenAvgSaving').innerText = sigenAvgYearly.toLocaleString('pt-PT', {style: 'currency', currency: 'EUR'}) + ' / ano';
+            document.getElementById('sigenMonthlyAvg').innerText = (sigenAvgYearly / 12).toLocaleString('pt-PT', {style: 'currency', currency: 'EUR'}) + '/mês';
+            document.getElementById('sigenPayback').innerText = sigenPaybackYear.toFixed(1).replace('.', ',') + ' Anos';
+
+            updateChart(years, huaweiCumulative, sigenCumulative);
+        }
+
+        function updateChart(years, huaweiData, sigenData) {
+            const ctx = document.getElementById('paybackChart').getContext('2d');
+
+            if (myChart) {
+                myChart.destroy();
+            }
+
+            myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: years.map(y => `Ano ${y}`),
+                    datasets: [
+                        {
+                            label: 'Huawei 5k (Líquido acumulado)',
+                            data: huaweiData,
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            borderWidth: 3,
+                            fill: false,
+                            tension: 0.1
+                        },
+                        {
+                            label: 'Sigenergy 6k (Líquido acumulado)',
+                            data: sigenData,
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            borderWidth: 3,
+                            fill: false,
+                            tension: 0.1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    },
+                    scales: {
+                        y: {
+                            grid: { color: '#f1f5f9' },
+                            ticks: {
+                                callback: function(value) {
+                                    return value.toLocaleString('pt-PT') + ' €';
+                                }
+                            }
+                        },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        window.onload = () => {
+            toggleTariffInputs();
+            updateSimulation();
+        };
+    </script>
+</body>
+</html>
