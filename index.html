@@ -171,10 +171,18 @@
             <span>Consumo anual: <strong id="consYear" class="text-slate-800">–</strong></span>
         </div>
 
+        <!-- Tabs (só em mobile; em ecrãs largos os dois cartões aparecem lado a lado) -->
+        <div class="md:hidden grid grid-cols-2 gap-1 bg-slate-200 rounded-xl p-1 mb-4" role="tablist">
+            <button id="tab-sigen" type="button" role="tab" onclick="selectTab('sigen')"
+                class="rounded-lg py-2 text-sm font-bold">Sigenergy 6k</button>
+            <button id="tab-huawei" type="button" role="tab" onclick="selectTab('huawei')"
+                class="rounded-lg py-2 text-sm font-bold">Huawei 5k</button>
+        </div>
+
         <!-- Results Cards -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
             <!-- Huawei Card -->
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 relative overflow-hidden">
+            <div id="card-huawei" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 relative overflow-hidden">
                 <div class="absolute top-0 right-0 bg-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-bl-lg">Huawei 5k (<span id="huaweiBatCap">5</span> kWh Bateria)</div>
                 <h2 class="text-xl font-bold text-slate-900 mb-4">Huawei 5k</h2>
                 <div id="huaweiWarning" class="hidden mb-3 text-xs bg-amber-50 text-amber-800 border border-amber-200 rounded-lg p-2"></div>
@@ -203,7 +211,7 @@
             </div>
 
             <!-- Sigenergy Card -->
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 relative overflow-hidden">
+            <div id="card-sigen" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 relative overflow-hidden">
                 <div class="absolute top-0 right-0 bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-bl-lg">Sigenergy 6k (<span id="sigenBatCap">6</span> kWh Bateria)</div>
                 <h2 class="text-xl font-bold text-slate-900 mb-4">Sigenergy 6k</h2>
                 <div id="sigenWarning" class="hidden mb-3 text-xs bg-amber-50 text-amber-800 border border-amber-200 rounded-lg p-2"></div>
@@ -570,7 +578,23 @@
             });
         }
 
+        function selectTab(active) {
+            ['sigen', 'huawei'].forEach(name => {
+                const on = name === active;
+                // Em mobile só o cartão ativo aparece; md:block mostra os dois em ecrãs largos.
+                document.getElementById('card-' + name).classList.toggle('hidden', !on);
+                document.getElementById('card-' + name).classList.toggle('md:block', !on);
+                const tab = document.getElementById('tab-' + name);
+                tab.setAttribute('aria-selected', on);
+                tab.classList.toggle('bg-white', on);
+                tab.classList.toggle('shadow-sm', on);
+                tab.classList.toggle('text-slate-900', on);
+                tab.classList.toggle('text-slate-500', !on);
+            });
+        }
+
         window.onload = () => {
+            selectTab('sigen');
             toggleTariffInputs();
             updateSimulation();
         };
